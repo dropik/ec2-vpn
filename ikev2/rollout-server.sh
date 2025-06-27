@@ -35,9 +35,8 @@ echo "Detected public IP: $PUBLIC_IP"
 
 # Configure libreswan
 CONFIG_FILE="/etc/ipsec.conf"
-if ! grep -q "IKEv2 VPN configuration" "$CONFIG_FILE"; then
-  echo "Configuring libreswan..."
-  cat > "$CONFIG_FILE" <<EOF
+echo "Configuring libreswan..."
+cat > "$CONFIG_FILE" <<EOF
 # IKEv2 VPN configuration
 config setup
   uniqueids=never
@@ -58,9 +57,6 @@ conn ikev2-vpn
   rightauth=eap-mschapv2
   rightsourceip=10.10.10.0/24
 EOF
-else
-  echo "libreswan is already configured."
-fi
 
 # Generate certificates if not already present
 CERT_DIR="/etc/ipsec.d/certs"
