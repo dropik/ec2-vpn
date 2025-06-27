@@ -11,12 +11,12 @@ fi
 echo "Updating system packages..."
 yum update -y
 
-# Install strongSwan if not already installed
+# Install libreswan if not already installed
 if ! command -v ipsec &> /dev/null; then
-  echo "Installing strongSwan..."
-  yum install -y strongswan
+  echo "Installing libreswan..."
+  yum install -y libreswan
 else
-  echo "strongSwan is already installed."
+  echo "libreswan is already installed."
 fi
 
 # Detect the current instance's public IP
@@ -27,24 +27,24 @@ if [[ -z "$PUBLIC_IP" ]]; then
 fi
 echo "Detected public IP: $PUBLIC_IP"
 
-# Configure strongSwan
-CONFIG_FILE="/etc/strongswan/ipsec.conf"
+# Configure libreswan
+CONFIG_FILE="/etc/ipsec.conf"
 if ! grep -q "IKEv2 VPN configuration" "$CONFIG_FILE"; then
-  echo "Configuring strongSwan..."
+  echo "Configuring libreswan..."
   cat > "$CONFIG_FILE" <<EOF
 # IKEv2 VPN configuration
 config setup
   uniqueids=never
 
 conn ikev2-vpn
-  keyexchange=ikev2
+  ikev2=insist
   auto=add
   dpdaction=clear
   dpddelay=300s
-  eap_identity=%any
-  left=%any
+  authby=secret
+  left=%defaultroute
   leftid=@$PUBLIC_IP
-  leftcert=/etc/strongswan/ipsec.d/certs/server-cert.pem
+  leftcert=/etc/ipsec.d/certs/server-cert.pem
   leftsendcert=always
   leftsubnet=0.0.0.0/0
   right=%any
@@ -53,25 +53,25 @@ conn ikev2-vpn
   rightsourceip=10.10.10.0/24
 EOF
 else
-  echo "strongSwan is already configured."
+  echo "libreswan is already configured."
 fi
 
 # Generate certificates if not already present
-CERT_DIR="/etc/strongswan/ipsec.d/certs"
+CERT_DIR="/etc/ipsec.d/certs"
 if [[ ! -f "$CERT_DIR/server-cert.pem" ]]; then
   echo "Generating certificates..."
   mkdir -p "$CERT_DIR"
-  ipsec pki --gen --outform pem > "$CERT_DIR/ca-key.pem"
-  ipsec pki --self --ca --lifetime 3650 --in "$CERT_DIR/ca-key.pem" --type rsa --dn "CN=IKEv2 VPN CA" --outform pem > "$CERT_DIR/ca-cert.pem"
-  ipsec pki --gen --outform pem > "$CERT_DIR/server-key.pem"
-  ipsec pki --pub --in "$CERT_DIR/server-key.pem" --type rsa | ipsec pki --issue --lifetime 1825 --cacert "$CERT_DIR/ca-cert.pem" --cakey "$CERT_DIR/ca-key.pem" --dn "CN=$PUBLIC_IP" --san "$PUBLIC_IP" --flag serverAuth --flag ikeIntermediate --outform pem > "$CERT_DIR/server-cert.pem"
+  ipsec newhostkey --output "$CERT_DIR/ca-key.pem"
+  ipsec newca --output "$CERT_DIR/ca-cert.pem" --key "$CERT_DIR/ca-key.pem" --dn "CN=IKEv2 VPN CA"
+  ipsec newhostkey --output "$CERT_DIR/server-key.pem"
+  ipsec newcert --output "$CERT_DIR/server-cert.pem" --key "$CERT_DIR/server-key.pem" --cacert "$CERT_DIR/ca-cert.pem" --dn "CN=$PUBLIC_IP" --san "$PUBLIC_IP"
 else
   echo "Certificates already exist."
 fi
 
-# Restart strongSwan to apply changes
-echo "Restarting strongSwan..."
-systemctl enable strongswan
-systemctl restart strongswan
+# Restart libreswan to apply changes
+echo "Restarting libreswan..."
+systemctl enable ipsec
+systemctl restart ipsec
 
 echo "IKEv2 server setup completed."
