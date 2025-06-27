@@ -54,7 +54,7 @@ conn ikev2-vpn
   leftsubnet=0.0.0.0/0
   right=%any
   rightid=%any
-  rightauth=eap-mschapv2
+  rightauth=eap
   rightsourceip=10.10.10.0/24
 EOF
 
