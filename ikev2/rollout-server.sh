@@ -39,7 +39,7 @@ echo "Configuring libreswan..."
 cat > "$CONFIG_FILE" <<EOF
 # IKEv2 VPN configuration
 config setup
-  uniqueids=never
+  uniqueids=no
 
 conn ikev2-vpn
   ikev2=insist
