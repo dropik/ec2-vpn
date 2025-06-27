@@ -35,7 +35,7 @@ echo "Detected public IP: $PUBLIC_IP"
 
 # Configure libreswan
 CONFIG_FILE="/etc/ipsec.conf"
-echo "Configuring libreswan..."
+echo "Configuring libreswan with PSK..."
 cat > "$CONFIG_FILE" <<EOF
 # IKEv2 VPN configuration
 config setup
@@ -49,34 +49,23 @@ conn ikev2-vpn
   authby=secret
   left=%defaultroute
   leftid=@$PUBLIC_IP
-  leftcert=/etc/ipsec.d/certs/server-cert.pem
-  leftsendcert=always
   leftsubnet=0.0.0.0/0
   right=%any
   rightid=%any
-  rightauth=eaponly
+  rightauth=secret
   rightsourceip=10.10.10.0/24
 EOF
 
-# Generate certificates if not already present
-CERT_DIR="/etc/ipsec.d/certs"
-if [[ ! -f "$CERT_DIR/server-cert.pem" ]]; then
-  echo "Generating certificates..."
-  mkdir -p "$CERT_DIR"
-
-  # Generate CA key and certificate
-  certutil -N -d sql:/etc/ipsec.d --empty-password
-  certutil -S -x -n "IKEv2 VPN CA" -s "CN=IKEv2 VPN CA" -k rsa -g 2048 -v 120 -d sql:/etc/ipsec.d -t "CT,," -2
-
-  # Generate server key and certificate
-  certutil -S -c "IKEv2 VPN CA" -n "Server-Cert" -s "CN=$PUBLIC_IP" -k rsa -g 2048 -v 120 -d sql:/etc/ipsec.d -t ",," -8 "$PUBLIC_IP"
-
-  # Export server certificate
-  pk12util -o "$CERT_DIR/server-cert.p12" -n "Server-Cert" -d sql:/etc/ipsec.d -W ""
-  openssl pkcs12 -in "$CERT_DIR/server-cert.p12" -clcerts -nokeys -out "$CERT_DIR/server-cert.pem" -passin pass:
-  openssl pkcs12 -in "$CERT_DIR/server-cert.p12" -nocerts -nodes -out "$CERT_DIR/server-key.pem" -passin pass:
+# Configure the pre-shared key
+SECRETS_FILE="/etc/ipsec.secrets"
+if [[ ! -f "$SECRETS_FILE" ]]; then
+  echo "Configuring pre-shared key..."
+  cat > "$SECRETS_FILE" <<EOF
+# Pre-shared key for IKEv2 VPN
+: PSK "your-strong-pre-shared-key"
+EOF
 else
-  echo "Certificates already exist."
+  echo "Pre-shared key file already exists. Skipping configuration."
 fi
 
 # Restart libreswan to apply changes
@@ -84,4 +73,4 @@ echo "Restarting libreswan..."
 systemctl enable ipsec
 systemctl restart ipsec
 
-echo "IKEv2 server setup completed."
+echo "IKEv2 server setup with PSK completed."
