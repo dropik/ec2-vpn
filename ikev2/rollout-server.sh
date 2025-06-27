@@ -19,10 +19,16 @@ else
   echo "libreswan is already installed."
 fi
 
-# Detect the current instance's public IP
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+# Retrieve the public IP using IMDSv2
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+if [[ -z "$TOKEN" ]]; then
+  echo "Failed to retrieve IMDSv2 token." >&2
+  exit 1
+fi
+
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" "http://169.254.169.254/latest/meta-data/public-ipv4")
 if [[ -z "$PUBLIC_IP" ]]; then
-  echo "Failed to retrieve the public IP address." >&2
+  echo "Failed to retrieve the public IP address using IMDSv2." >&2
   exit 1
 fi
 echo "Detected public IP: $PUBLIC_IP"
