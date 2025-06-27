@@ -67,10 +67,18 @@ CERT_DIR="/etc/ipsec.d/certs"
 if [[ ! -f "$CERT_DIR/server-cert.pem" ]]; then
   echo "Generating certificates..."
   mkdir -p "$CERT_DIR"
-  ipsec newhostkey --output "$CERT_DIR/ca-key.pem"
-  ipsec newca --output "$CERT_DIR/ca-cert.pem" --key "$CERT_DIR/ca-key.pem" --dn "CN=IKEv2 VPN CA"
-  ipsec newhostkey --output "$CERT_DIR/server-key.pem"
-  ipsec newcert --output "$CERT_DIR/server-cert.pem" --key "$CERT_DIR/server-key.pem" --cacert "$CERT_DIR/ca-cert.pem" --dn "CN=$PUBLIC_IP" --san "$PUBLIC_IP"
+
+  # Generate CA key and certificate
+  certutil -N -d sql:/etc/ipsec.d --empty-password
+  certutil -S -x -n "IKEv2 VPN CA" -s "CN=IKEv2 VPN CA" -k rsa -g 2048 -v 120 -d sql:/etc/ipsec.d -t "CT,," -2
+
+  # Generate server key and certificate
+  certutil -S -c "IKEv2 VPN CA" -n "Server-Cert" -s "CN=$PUBLIC_IP" -k rsa -g 2048 -v 120 -d sql:/etc/ipsec.d -t ",," -8 "$PUBLIC_IP"
+
+  # Export server certificate
+  pk12util -o "$CERT_DIR/server-cert.p12" -n "Server-Cert" -d sql:/etc/ipsec.d -W ""
+  openssl pkcs12 -in "$CERT_DIR/server-cert.p12" -clcerts -nokeys -out "$CERT_DIR/server-cert.pem" -passin pass:
+  openssl pkcs12 -in "$CERT_DIR/server-cert.p12" -nocerts -nodes -out "$CERT_DIR/server-key.pem" -passin pass:
 else
   echo "Certificates already exist."
 fi
